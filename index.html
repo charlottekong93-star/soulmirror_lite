@@ -628,7 +628,7 @@ async function analyze() {
 }
 
 async function callGeminiAnalyze(content, retry) {
-  var models = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  var models = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash'];
   var modelIndex = retry || 0;
   var model = models[Math.min(modelIndex, models.length - 1)];
   var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
@@ -709,7 +709,7 @@ async function sendChat() {
 }
 
 async function callGeminiChat(message, turnCount, retry) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + apiKey;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + apiKey;
 
   var context = '用户日记：' + diaryContent +
     '\n\n分析结果：\n一句话：' + currentResult.one_sentence +
