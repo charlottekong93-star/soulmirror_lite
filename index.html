@@ -466,6 +466,7 @@
    全局状态
    ============================================================ */
 var apiKey = 'sk-7a5bcc9e26a04ae98606ebccce7a032d';
+var SERVICE_ENABLED = false;  // API 服务开关：false=禁用所有 AI 调用，true=正常
 var currentResult = null;
 var diaryContent = '';
 var chatHistory = [];   // [{role:'user'|'model', content:'...'}]
@@ -571,6 +572,7 @@ function updateCount() {
    核心：分析日记（调用 AI API）
    ============================================================ */
 async function analyze() {
+  if (!SERVICE_ENABLED) { showError('⚠️ 服务暂维护中，AI 复盘功能暂时不可用。'); return; }
   if (location.protocol === 'file:') {
     showError('⚠️ 当前以文件方式打开，浏览器安全限制无法调用 API。请打开终端运行：cd ~/Downloads && python3 -m http.server 8080，然后浏览器访问 http://localhost:8080/soulmirror_final.html');
     return;
@@ -651,6 +653,7 @@ async function callGeminiAnalyze(content, retry) {
    核心：聊天（调用 AI API）
    ============================================================ */
 async function sendChat() {
+  if (!SERVICE_ENABLED) { showError('⚠️ 服务暂维护中，AI 对话功能暂时不可用。'); return; }
   if (isChatLoading || !currentResult) return;
   var input = document.getElementById('chat-input');
   var text = input.value.trim();
