@@ -364,15 +364,7 @@
     </div>
   </header>
 
-  <!-- API Key 设置栏 -->
-  <div class="api-bar" id="api-bar">
-    <div class="api-bar-inner">
-      <label for="api-key-input">Gemini API Key</label>
-      <input class="api-input" type="password" id="api-key-input" placeholder="粘贴你的 Gemini API Key（AIza...）" autocomplete="off" />
-      <button class="api-save-btn" onclick="saveApiKey()">保存</button>
-      <span class="api-status none" id="api-status">未设置</span>
-    </div>
-  </div>
+  <!-- API Key 已硬编码，用户无需自行填写 -->
 
   <main class="sm-main">
     <!-- Hero -->
@@ -473,7 +465,7 @@
 /* ============================================================
    全局状态
    ============================================================ */
-var apiKey = localStorage.getItem('sm_api_key') || '';
+var apiKey = 'YOUR_DEEPSEEK_API_KEY_HERE';
 var currentResult = null;
 var diaryContent = '';
 var chatHistory = [];   // [{role:'user'|'model', content:'...'}]
@@ -537,7 +529,6 @@ var CHAT_SYSTEM_INSTRUCTION = `你是一位极具同理心的人格教练。用�
    ============================================================ */
 window.addEventListener('DOMContentLoaded', function () {
   buildWaveTitle();
-  initApiBar();
 });
 
 /* ── 波浪标题 ── */
@@ -571,35 +562,13 @@ function buildWaveTitle() {
   titleEl.addEventListener('mouseleave', function () { isHovering = false; if (!waveRAF) waveRAF = requestAnimationFrame(loop); });
 }
 
-/* ── API Key 初始化 ── */
-function initApiBar() {
-  if (apiKey) {
-    document.getElementById('api-key-input').value = apiKey;
-    setApiStatus(true);
-  }
-}
-
-function saveApiKey() {
-  var val = document.getElementById('api-key-input').value.trim();
-  if (!val) { setApiStatus(false); return; }
-  apiKey = val;
-  localStorage.setItem('sm_api_key', apiKey);
-  setApiStatus(true);
-}
-
-function setApiStatus(ok) {
-  var el = document.getElementById('api-status');
-  if (ok) { el.textContent = '✓ 已就绪'; el.className = 'api-status ok'; }
-  else     { el.textContent = '未设置';   el.className = 'api-status none'; }
-}
-
 /* ── 字数统计 ── */
 function updateCount() {
   document.getElementById('char-count').textContent = document.getElementById('diary-input').value.length + ' 字';
 }
 
 /* ============================================================
-   核心：分析日记（调用 Gemini API）
+   核心：分析日记（调用 AI API）
    ============================================================ */
 async function analyze() {
   if (location.protocol === 'file:') {
@@ -608,8 +577,6 @@ async function analyze() {
   }
   var content = document.getElementById('diary-input').value.trim();
   if (!content) { document.getElementById('diary-input').placeholder = '请先写点什么再开始复盘 ✨'; return; }
-
-  if (!apiKey) { showError('请先在顶部输入并保存你的 Gemini API Key。'); return; }
 
   setAnalyzeLoading(true);
   hideError();
@@ -628,24 +595,32 @@ async function analyze() {
 }
 
 async function callGeminiAnalyze(content, retry) {
-  var models = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+  var models = ['deepseek-chat', 'deepseek-reasoner'];
   var modelIndex = retry || 0;
   var model = models[Math.min(modelIndex, models.length - 1)];
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
+  var url = 'https://api.deepseek.com/v1/chat/completions';
 
   var jsonPrompt = content + '\n\n请严格按照以下 JSON 格式输出，不要有任何其他文字：\n{"one_sentence":"...","summary":"...","insight":"...","questions":["...","...","..."]}';
 
   var body = {
-    system_instruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-    contents: [{ role: 'user', parts: [{ text: jsonPrompt }] }],
-    generationConfig: { temperature: 0.9, maxOutputTokens: 2048 }
+    model: model,
+    messages: [
+      { role: 'system', content: SYSTEM_INSTRUCTION },
+      { role: 'user', content: jsonPrompt }
+    ],
+    temperature: 0.9,
+    max_tokens: 2048
   };
 
-  var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  var res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+    body: JSON.stringify(body)
+  });
 
   if (!res.ok) {
     var err = await res.json().catch(function(){return {};});
-    var msg = (err.error && err.error.message) || res.statusText;
+    var msg = (err.error && (err.error.message || JSON.stringify(err.error))) || res.statusText;
     if (res.status === 429 || res.status === 503) {
       if (!retry || retry < 2) {
         var waitSec = retry === 1 ? 10 : 5;
@@ -659,7 +634,7 @@ async function callGeminiAnalyze(content, retry) {
   }
 
   var data = await res.json();
-  var text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text;
+  var text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
   if (!text) throw new Error('AI 返回了空内容，请重试。');
 
   // 提取 JSON（模型可能在 JSON 前后加文字）
@@ -673,14 +648,13 @@ async function callGeminiAnalyze(content, retry) {
 }
 
 /* ============================================================
-   核心：聊天（调用 Gemini API）
+   核心：聊天（调用 AI API）
    ============================================================ */
 async function sendChat() {
   if (isChatLoading || !currentResult) return;
   var input = document.getElementById('chat-input');
   var text = input.value.trim();
   if (!text) return;
-  if (!apiKey) { showError('请先设置 API Key。'); return; }
 
   input.value = '';
   appendMsg('user', text);
@@ -709,7 +683,8 @@ async function sendChat() {
 }
 
 async function callGeminiChat(message, turnCount, retry) {
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + apiKey;
+  var url = 'https://api.deepseek.com/v1/chat/completions';
+  var model = 'deepseek-chat';
 
   var context = '用户日记：' + diaryContent +
     '\n\n分析结果：\n一句话：' + currentResult.one_sentence +
@@ -722,28 +697,35 @@ async function callGeminiChat(message, turnCount, retry) {
     '\n\n【当前对话状态】\n- 当前是第 ' + turnCount + ' 轮对话。' +
     (turnCount > 3 ? '注意：对话已超过3轮，请开始融合背景与对话内容，给出中肯结论并优雅地结束问答。' : '');
 
-  var contents = chatHistory.slice(0, -1).map(function(m) {
-    return { role: m.role, parts: [{ text: m.content }] };
+  var messages = [{ role: 'system', content: sysPrompt }];
+  chatHistory.forEach(function(m) {
+    messages.push({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content });
   });
-  contents.push({ role: 'user', parts: [{ text: message }] });
+  messages.push({ role: 'user', content: message });
 
   var body = {
-    system_instruction: { parts: [{ text: sysPrompt }] },
-    contents: contents
+    model: model,
+    messages: messages
   };
 
-  var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  var res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+    body: JSON.stringify(body)
+  });
+
   if (!res.ok) {
     var err = await res.json().catch(function(){return {};});
     if (res.status === 429 && (!retry || retry < 2)) {
       await new Promise(function(r){ setTimeout(r, 5000); });
       return callGeminiChat(message, turnCount, (retry || 0) + 1);
     }
-    throw new Error((err.error && err.error.message) || '请求失败（' + res.status + '）');
+    var msg = (err.error && (err.error.message || JSON.stringify(err.error))) || '请求失败（' + res.status + '）';
+    throw new Error(msg);
   }
 
   var data = await res.json();
-  return data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text || '抱歉，我暂时没有回应，请再试一次。';
+  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '抱歉，我暂时没有回应，请再试一次。';
 }
 
 /* ============================================================
