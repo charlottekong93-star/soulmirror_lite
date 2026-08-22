@@ -595,7 +595,7 @@ async function analyze() {
 }
 
 async function callGeminiAnalyze(content, retry) {
-  var models = ['deepseek-chat', 'deepseek-reasoner'];
+  var models = ['deepseek-v4-flash'];
   var modelIndex = retry || 0;
   var model = models[Math.min(modelIndex, models.length - 1)];
   var url = 'https://api.deepseek.com/v1/chat/completions';
@@ -684,7 +684,7 @@ async function sendChat() {
 
 async function callGeminiChat(message, turnCount, retry) {
   var url = 'https://api.deepseek.com/v1/chat/completions';
-  var model = 'deepseek-chat';
+  var model = 'deepseek-v4-flash';
 
   var context = '用户日记：' + diaryContent +
     '\n\n分析结果：\n一句话：' + currentResult.one_sentence +
